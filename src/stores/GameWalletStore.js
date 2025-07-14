@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, markRaw } from 'vue';
 import { ethers } from 'ethers';
 
 export const useGameWalletStore = defineStore('gameWallet', () => {
@@ -7,21 +7,28 @@ export const useGameWalletStore = defineStore('gameWallet', () => {
     const isMetaMask = ref(false);
     const provider = ref(null);
     const signer = ref(null);
-    
+    let initialized = false;
+
     async function initMM() {
+        if (initialized) return;
+        
         try {
-            isMetaMask.value = ethereum.isMetaMask;
+            if (typeof window !== 'undefined' && window.ethereum) {
+                isMetaMask.value = window.ethereum.isMetaMask;
+                initialized = true;
+            }
         } catch (err) {
-            console.log('GameWalletStore:initMM failed', err);
+            console.warn('GameWalletStore:initMM failed', err);
         }
     }
 
     async function initialize() {
+        await initMM();
         if (!isMetaMask.value) {
-            throw new Error('MetaMask not installed');
+            console.warn('MetaMask not installed');
+            return false;
         }
-        await fill();
-        return true;
+        return await fill();
     }
 
     async function reset() {
@@ -31,21 +38,27 @@ export const useGameWalletStore = defineStore('gameWallet', () => {
     }
 
     async function fill() {
+        if (!window?.ethereum) {
+            console.warn('Ethereum provider not found');
+            return false;
+        }
+
         try {
-            const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
             account.value = accounts[0];
-            provider.value = new ethers.BrowserProvider(window.ethereum);
-            signer.value = await provider.value.getSigner();
+            // Use markRaw to prevent reactivity issues with ethers objects
+            provider.value = markRaw(new ethers.BrowserProvider(window.ethereum));
+            signer.value = markRaw(await provider.value.getSigner());
             return true;
         } catch (err) {
-            console.error('GameWalletStore:fill failed', err);
+            console.warn('GameWalletStore:fill failed', err);
             return false;
         }
     }
 
-    // Listen for account changes
+    // Only set up listeners if we're in a browser environment
     if (typeof window !== 'undefined' && window.ethereum) {
-        ethereum.on('accountsChanged', async (accounts) => {
+        window.ethereum.on('accountsChanged', async (accounts) => {
             if (accounts.length > 0) {
                 await fill();
             } else {

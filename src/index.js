@@ -1,14 +1,8 @@
-import { Game } from './components/Game.vue';
-import { CanvasManager } from './core/Canvas';
-import { useGameWalletStore } from './stores/GameWalletStore';
+// panadero-solarsysinvaders/src/index.js
+import SsiGameNew from './components/SsiGameNew.vue';
 
-// Export components and utilities
-export { Game, CanvasManager, useGameWalletStore };
+// Export as default for the framework
+export default SsiGameNew;
 
-// Vue plugin
-export default {
-  install: (app, options = {}) => {
-    // Register components globally
-    app.component('SolarSysGame', Game);
-  }
-}; 
+// Log that we're loaded
+console.log('Solar System Game module index loaded');
