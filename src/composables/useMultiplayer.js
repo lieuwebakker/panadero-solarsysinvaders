@@ -8,49 +8,66 @@ export function useMultiplayer(config = {}) {
         myShip: null
     });
     const isConnected = ref(false);
-    let socket = null;
+    const socket = ref(null);  // Changed to ref
 
     const connect = () => {
         console.log('=== MULTIPLAYER: Connecting to server ===');
         console.log('Server URL:', config.serverUrl);
         
-        socket = io(config.serverUrl, {
+        socket.value = io(config.serverUrl, {
             transports: ['websocket'],
             reconnection: true,
             reconnectionAttempts: 5,
             reconnectionDelay: 1000
         });
 
-        socket.on('connect', () => {
+        socket.value.on('connect', () => {
             console.log('=== MULTIPLAYER: Connected! ===');
-            console.log('Socket ID:', socket.id);
+            console.log('Socket ID:', socket.value.id);
             isConnected.value = true;
             gameState.value.status = 'connected';
         });
 
-        socket.on('disconnect', (reason) => {
+        socket.value.on('disconnect', (reason) => {
             console.log('=== MULTIPLAYER: Disconnected ===');
             console.log('Reason:', reason);
             isConnected.value = false;
             gameState.value.status = 'disconnected';
         });
 
-        socket.on('game_state', (state) => {
+        socket.value.on('game_state', (state) => {
             console.log('=== MULTIPLAYER: Game state update ===');
             console.log('State:', state);
             gameState.value = state;
         });
 
-        socket.on('error', (error) => {
+        socket.value.on('error', (error) => {
             console.error('=== MULTIPLAYER: Socket error ===', error);
         });
     };
 
     const disconnect = () => {
-        if (socket) {
+        if (socket.value) {
             console.log('=== MULTIPLAYER: Manual disconnect ===');
-            socket.disconnect();
-            socket = null;
+            socket.value.disconnect();
+            socket.value = null;
+        }
+    };
+
+    const sendShipState = (shipState) => {
+        if (socket.value && isConnected.value) {
+            socket.value.emit('ship_state', shipState);
+        }
+    };
+
+    // Add the sendInput function
+    const sendInput = (inputType, value) => {
+        if (socket.value && isConnected.value) {
+            socket.value.emit('player_input', {
+                type: inputType,
+                value: value,
+                timestamp: Date.now()
+            });
         }
     };
 
@@ -63,6 +80,8 @@ export function useMultiplayer(config = {}) {
         isConnected,
         connect,
         disconnect,
-        socket: () => socket
+        sendShipState,
+        sendInput,  // Add this to the return object
+        socket  // Return the socket ref
     };
 } 

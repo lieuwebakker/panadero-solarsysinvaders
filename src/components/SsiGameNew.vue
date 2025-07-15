@@ -27,7 +27,7 @@ const isRunning = ref(false);
 const ship = ref(null);
 
 // Initialize multiplayer
-const { gameState, isConnected, connect } = useMultiplayer({
+const { gameState, isConnected, connect, sendShipState, sendInput, socket } = useMultiplayer({
     serverUrl: props.serverUrl
 });
 
@@ -52,62 +52,134 @@ const initCanvas = () => {
     return true;
 };
 
+// In the script section, add a method to draw ships
+const drawShip = (ctx, shipState) => {
+    const { position, angle, color = '#FFFFFF' } = shipState; // Default to white if no color
+    console.log('Drawing ship with color:', color); // Debug log
+
+    ctx.save();
+    ctx.translate(position.x, position.y);
+    ctx.rotate(angle);
+    
+    // Draw ship
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2;
+    
+    // Ship shape
+    ctx.moveTo(0, -15);
+    ctx.lineTo(10, 15);
+    ctx.lineTo(0, 10);
+    ctx.lineTo(-10, 15);
+    ctx.closePath();
+    
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw thrust if engine is on
+    if (shipState.controls?.engineOn) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#FF9900';
+        ctx.moveTo(0, 12);
+        ctx.lineTo(5, 20);
+        ctx.lineTo(0, 25);
+        ctx.lineTo(-5, 20);
+        ctx.closePath();
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+};
+
+// Current key handlers need to be fixed to match the server's expected input types
 const handleKeyDown = (e) => {
+    console.log('Key pressed:', e.key); // Debug log
     if (!ship.value) return;
+    
     switch(e.key) {
         case 'ArrowLeft':
+        case 'a':
+        case 'A':
             ship.value.rotatingLeft = true;
+            sendInput('rotate_left', true);
             break;
         case 'ArrowRight':
+        case 'd':
+        case 'D':
             ship.value.rotatingRight = true;
+            sendInput('rotate_right', true);
             break;
         case 'ArrowUp':
+        case 'w':
+        case 'W':
             ship.value.engineOn = true;
+            sendInput('thrust', true);
             break;
     }
 };
 
 const handleKeyUp = (e) => {
+    console.log('Key released:', e.key); // Debug log
     if (!ship.value) return;
+    
     switch(e.key) {
         case 'ArrowLeft':
+        case 'a':
+        case 'A':
             ship.value.rotatingLeft = false;
+            sendInput('rotate_left', false);
             break;
         case 'ArrowRight':
+        case 'd':
+        case 'D':
             ship.value.rotatingRight = false;
+            sendInput('rotate_right', false);
             break;
         case 'ArrowUp':
+        case 'w':
+        case 'W':
             ship.value.engineOn = false;
+            sendInput('thrust', false);
             break;
     }
 };
 
+// Update the gameLoop
 const gameLoop = () => {
     if (!isRunning.value) return;
     
     canvasManager.value.drawStarfield();
     
-    if (ship.value) {
-        ship.value.move();
-        ship.value.draw(canvasManager.value.ctx);
+    // Debug log the game state
+    console.log('Current game state:', gameState.value);
+    
+    // Draw all players from game state
+    for (const [id, playerState] of Object.entries(gameState.value.players)) {
+        console.log(`Drawing player ${id} with state:`, playerState); // Debug log
+        drawShip(canvasManager.value.ctx, playerState);
         
-        // Update info panel data
-        shipInfo.value = {
-            position: { 
-                x: Math.round(ship.value.x), 
-                y: Math.round(ship.value.y) 
-            },
-            angle: Math.round(ship.value.angle * 180 / Math.PI),
-            velocity: { 
-                x: ship.value.velocity.x.toFixed(2), 
-                y: ship.value.velocity.y.toFixed(2) 
-            },
-            controls: {
-                rotatingLeft: ship.value.rotatingLeft,
-                rotatingRight: ship.value.rotatingRight,
-                engineOn: ship.value.engineOn
-            }
-        };
+        // Update info panel for our ship
+        if (socket.value && id === socket.value.id && ship.value) {
+            ship.value.x = playerState.position.x;
+            ship.value.y = playerState.position.y;
+            ship.value.angle = playerState.angle;
+            ship.value.velocity = playerState.velocity;
+            
+            shipInfo.value = {
+                position: { 
+                    x: Math.round(playerState.position.x), 
+                    y: Math.round(playerState.position.y) 
+                },
+                angle: Math.round(playerState.angle * 180 / Math.PI),
+                velocity: { 
+                    x: playerState.velocity.x.toFixed(2), 
+                    y: playerState.velocity.y.toFixed(2) 
+                },
+                controls: playerState.controls,
+                color: playerState.color // Make sure color is included
+            };
+        }
     }
     
     requestAnimationFrame(gameLoop);
@@ -144,6 +216,10 @@ onUnmounted(() => {
         <div class="info-panel">
             <div class="info-section">
                 <h3>Ship Status</h3>
+                <div class="info-row">
+                    <span class="info-label">Color:</span>
+                    <span class="info-value" :style="{ color: shipInfo.color }">■</span>
+                </div>
                 <div class="info-row">
                     <span class="info-label">Position:</span>
                     <span class="info-value">X:{{ shipInfo.position.x }}</span>
