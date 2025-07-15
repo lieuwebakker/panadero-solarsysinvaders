@@ -83,7 +83,8 @@ const shipInfo = ref({
         rotatingLeft: false,
         rotatingRight: false,
         engineOn: false
-    }
+    },
+    home: { x: 0, y: 0 } // Added home position to shipInfo
 });
 
 const initCanvas = () => {
@@ -144,36 +145,24 @@ const drawShip = (ctx, shipState) => {
     ctx.restore();
 };
 
-// Add function to draw home position
-const drawHomePosition = (ctx, shipState) => {
-    const { homePosition, color } = shipState;
+// Add function to draw home positions
+const drawHome = (ctx, homePosition) => {
+    // Convert world coordinates to screen coordinates
+    const screenPos = worldToScreen(homePosition.x, homePosition.y);
     
     ctx.save();
-    ctx.translate(homePosition.x, homePosition.y);
+    ctx.translate(screenPos.x, screenPos.y);
     
-    // Draw safe zone circle
-    ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.setLineDash([5, 5]); // Dashed circle
-    ctx.lineWidth = 1;
-    ctx.arc(0, 0, SHIP_RADIUS * 2, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    // Draw home marker
-    ctx.beginPath();
-    ctx.setLineDash([]); // Solid lines
-    ctx.strokeStyle = color;
+    // Draw a box with border lines
+    const boxSize = 20; // Size of the box
+    ctx.strokeStyle = homePosition.color || '#FFFFFF'; // Use player color or default to white
     ctx.lineWidth = 2;
     
-    // Draw 'H' symbol
-    ctx.moveTo(-5, -5);
-    ctx.lineTo(-5, 5);
-    ctx.moveTo(5, -5);
-    ctx.lineTo(5, 5);
-    ctx.moveTo(-5, 0);
-    ctx.lineTo(5, 0);
-    
+    // Draw the box
+    ctx.beginPath();
+    ctx.rect(-boxSize/2, -boxSize/2, boxSize, boxSize);
     ctx.stroke();
+    
     ctx.restore();
 };
 
@@ -235,57 +224,39 @@ const drawCollectible = (ctx, collectible) => {
 };
 
 // Current key handlers need to be fixed to match the server's expected input types
-const handleKeyDown = (e) => {
-    console.log('Key pressed:', e.key); // Debug log
-    if (!ship.value) return;
-    
-    switch(e.key) {
+function handleKeyDown(event) {
+    switch(event.key) {
         case 'ArrowLeft':
-        case 'a':
-        case 'A':
-            ship.value.rotatingLeft = true;
             sendInput('rotate_left', true);
             break;
         case 'ArrowRight':
-        case 'd':
-        case 'D':
-            ship.value.rotatingRight = true;
             sendInput('rotate_right', true);
             break;
         case 'ArrowUp':
-        case 'w':
-        case 'W':
-            ship.value.engineOn = true;
             sendInput('thrust', true);
             break;
+        case 'h':
+        case 'H':
+            // Send warp home command when H is pressed
+            sendInput('warp_home', true);
+            break;
     }
-};
+}
 
-const handleKeyUp = (e) => {
-    console.log('Key released:', e.key); // Debug log
-    if (!ship.value) return;
-    
-    switch(e.key) {
+function handleKeyUp(event) {
+    switch(event.key) {
         case 'ArrowLeft':
-        case 'a':
-        case 'A':
-            ship.value.rotatingLeft = false;
             sendInput('rotate_left', false);
             break;
         case 'ArrowRight':
-        case 'd':
-        case 'D':
-            ship.value.rotatingRight = false;
             sendInput('rotate_right', false);
             break;
         case 'ArrowUp':
-        case 'w':
-        case 'W':
-            ship.value.engineOn = false;
             sendInput('thrust', false);
             break;
+        // No need for keyup on 'H' since it's an instant action
     }
-};
+}
 
 // Update the gameLoop
 const gameLoop = () => {
@@ -304,8 +275,10 @@ const gameLoop = () => {
     drawStarfield(canvasManager.value.ctx);
     
     // Draw home positions first (so they appear behind ships)
-    for (const [id, playerState] of Object.entries(gameState.value.players)) {
-        drawHomePosition(canvasManager.value.ctx, playerState);
+    if (gameState.value.homePositions) {
+        for (const homePosition of Object.values(gameState.value.homePositions)) {
+            drawHome(canvasManager.value.ctx, homePosition);
+        }
     }
     
     // Draw collectibles
@@ -335,13 +308,17 @@ const gameLoop = () => {
                     x: Math.round(playerState.position.x), 
                     y: Math.round(playerState.position.y) 
                 },
+                home: {  // Add this
+                    x: Math.round(playerState.home.x),
+                    y: Math.round(playerState.home.y)
+                },
                 angle: Math.round(playerState.angle * 180 / Math.PI),
                 velocity: { 
                     x: playerState.velocity.x.toFixed(2), 
                     y: playerState.velocity.y.toFixed(2) 
                 },
                 controls: playerState.controls,
-                color: playerState.color // Make sure color is included
+                color: playerState.color
             };
         }
     }
@@ -388,6 +365,11 @@ onUnmounted(() => {
                     <span class="info-label">Position:</span>
                     <span class="info-value">X:{{ shipInfo.position.x }}</span>
                     <span class="info-value">Y:{{ shipInfo.position.y }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Home:</span>
+                    <span class="info-value">X:{{ shipInfo.home.x }}</span>
+                    <span class="info-value">Y:{{ shipInfo.home.y }}</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Angle:</span>
