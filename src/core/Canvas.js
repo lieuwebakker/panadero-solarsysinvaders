@@ -1,17 +1,34 @@
 export class CanvasManager {
-    constructor(canvas, width = 600, height = 400) {  // Changed default dimensions
+    constructor(canvas, width = 800, height = 600) {
+        if (!canvas) {
+            throw new Error('Canvas element is required');
+        }
+        
         this.mainCanvas = canvas;
         this.width = width;
         this.height = height;
-        this.ctx = canvas.getContext('2d', {
-            alpha: false  // Add this to prevent transparency issues
-        });
         
-        // Initialize canvas with correct size
-        this.setCanvasSize(width, height);
-        
-        // Initialize stars
-        this.stars = this.generateStars();
+        try {
+            this.ctx = canvas.getContext('2d', {
+                alpha: false,
+                desynchronized: true // Potential performance boost
+            });
+            
+            if (!this.ctx) {
+                throw new Error('Failed to get 2D context');
+            }
+            
+            // Initialize canvas with correct size
+            this.setCanvasSize(width, height);
+            
+            // Initialize stars
+            this.stars = this.generateStars();
+            
+            console.log('CanvasManager initialized successfully');
+        } catch (error) {
+            console.error('CanvasManager initialization failed:', error);
+            throw error;
+        }
     }
 
     setCanvasSize(width, height) {
@@ -100,6 +117,12 @@ export class CanvasManager {
     }
 
     destroy() {
-        this.ctx = null;
+        if (this.ctx) {
+            // Clear the canvas before destroying
+            this.ctx.clearRect(0, 0, this.width, this.height);
+            this.ctx = null;
+        }
+        this.mainCanvas = null;
+        this.stars = null;
     }
 } 

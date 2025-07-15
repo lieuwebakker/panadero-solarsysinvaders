@@ -1,6 +1,6 @@
 # Panadero SolarSys Invaders
 
-A space-themed NFT game built by Panadero Services.
+A space-themed NFT game built by Panadero Services. ioServer added
 
 ## Description
 

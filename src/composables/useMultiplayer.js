@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 
 export function useMultiplayer(config = {}) {
     const gameState = ref({
+        status: 'init',
         players: {},
         myShip: null
     });
@@ -10,67 +11,58 @@ export function useMultiplayer(config = {}) {
     let socket = null;
 
     const connect = () => {
-        if (socket) return;
+        console.log('=== MULTIPLAYER: Connecting to server ===');
+        console.log('Server URL:', config.serverUrl);
         
-        console.log('[SSI Game] Attempting socket connection...');
-        
-        // Use configured server URL or fallback to environment variable
-        const serverUrl = config.serverUrl || import.meta.env.VITE_WEBSOCKET_SERVER || window.WEBSOCKET_SERVER;
-        
-        // Try to connect to the game server
-        socket = io(serverUrl, {
+        socket = io(config.serverUrl, {
+            transports: ['websocket'],
             reconnection: true,
             reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            transports: ['websocket'],
-            ...config.socketOptions
+            reconnectionDelay: 1000
         });
 
-        // Connection events
         socket.on('connect', () => {
-            console.log('[SSI Game] Connected! Socket ID:', socket.id);
+            console.log('=== MULTIPLAYER: Connected! ===');
+            console.log('Socket ID:', socket.id);
             isConnected.value = true;
-            socket.emit('join_game');
+            gameState.value.status = 'connected';
         });
 
-        socket.on('disconnect', () => {
-            console.log('[SSI Game] Disconnected from server');
+        socket.on('disconnect', (reason) => {
+            console.log('=== MULTIPLAYER: Disconnected ===');
+            console.log('Reason:', reason);
             isConnected.value = false;
-            gameState.value = { players: {}, myShip: null };
+            gameState.value.status = 'disconnected';
         });
 
-        socket.on('connect_error', (error) => {
-            console.error('[SSI Game] Connection error:', error);
-            isConnected.value = false;
-        });
-
-        // Game state updates
         socket.on('game_state', (state) => {
-            console.log('[SSI Game] Received game state:', state);
+            console.log('=== MULTIPLAYER: Game state update ===');
+            console.log('State:', state);
             gameState.value = state;
         });
+
+        socket.on('error', (error) => {
+            console.error('=== MULTIPLAYER: Socket error ===', error);
+        });
     };
 
-    const sendPlayerInput = (input) => {
-        if (!socket?.connected) {
-            console.warn('[SSI Game] Cannot send input - not connected');
-            return;
-        }
-        socket.emit('player_input', input);
-    };
-
-    onUnmounted(() => {
+    const disconnect = () => {
         if (socket) {
-            console.log('[SSI Game] Cleaning up socket connection');
+            console.log('=== MULTIPLAYER: Manual disconnect ===');
             socket.disconnect();
             socket = null;
         }
+    };
+
+    onUnmounted(() => {
+        disconnect();
     });
 
     return {
         gameState,
         isConnected,
         connect,
-        sendPlayerInput
+        disconnect,
+        socket: () => socket
     };
 } 
