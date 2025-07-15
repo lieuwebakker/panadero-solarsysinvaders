@@ -27,6 +27,48 @@ const canvasManager = ref(null);
 const isRunning = ref(false);
 const ship = ref(null);
 
+// Add camera state
+const camera = ref({
+    x: 0,
+    y: 0,
+    scale: 1
+});
+
+// Add function to convert world coordinates to screen coordinates
+const worldToScreen = (worldX, worldY) => {
+    const screenX = (worldX - camera.value.x) * camera.value.scale + GAME_WIDTH / 2;
+    const screenY = (worldY - camera.value.y) * camera.value.scale + GAME_HEIGHT / 2;
+    return { x: screenX, y: screenY };
+};
+
+// Update drawStarfield to create infinite star effect
+const drawStarfield = (ctx) => {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    // Create grid of stars that moves with camera
+    const gridSize = 200;
+    const starDensity = 0.1;
+    
+    const startX = Math.floor(camera.value.x / gridSize) * gridSize;
+    const startY = Math.floor(camera.value.y / gridSize) * gridSize;
+    
+    for (let x = startX - GAME_WIDTH; x < startX + GAME_WIDTH * 2; x += gridSize) {
+        for (let y = startY - GAME_HEIGHT; y < startY + GAME_HEIGHT * 2; y += gridSize) {
+            // Use position as seed for deterministic randomness
+            const seed = Math.abs(Math.sin(x * 0.5 + y * 0.3) * 10000);
+            if (seed % 1 < starDensity) {
+                const screenPos = worldToScreen(x + (seed * gridSize), y + (seed * gridSize * 1.5));
+                
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + (seed % 0.7)})`;
+                ctx.beginPath();
+                ctx.arc(screenPos.x, screenPos.y, 1 + (seed % 2), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+};
+
 // Initialize multiplayer
 const { gameState, isConnected, connect, sendShipState, sendInput, socket } = useMultiplayer({
     serverUrl: props.serverUrl
@@ -53,16 +95,16 @@ const initCanvas = () => {
     return true;
 };
 
-// In the script section, add a method to draw ships
+// Update ship drawing to use camera transform
 const drawShip = (ctx, shipState) => {
-    const { position, angle, color = '#FFFFFF', isColliding } = shipState;
-
+    const screenPos = worldToScreen(shipState.position.x, shipState.position.y);
+    
     ctx.save();
-    ctx.translate(position.x, position.y);
-    ctx.rotate(angle);
+    ctx.translate(screenPos.x, screenPos.y);
+    ctx.rotate(shipState.angle);
     
     // Draw collision indicator if colliding
-    if (isColliding) {
+    if (shipState.isColliding) {
         ctx.beginPath();
         ctx.strokeStyle = '#FF0000';
         ctx.lineWidth = 3;
@@ -72,8 +114,8 @@ const drawShip = (ctx, shipState) => {
     
     // Draw ship
     ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
+    ctx.strokeStyle = shipState.color;
+    ctx.fillStyle = shipState.color;
     ctx.lineWidth = 2;
     
     // Ship shape - all values multiplied by 2/3
@@ -97,15 +139,50 @@ const drawShip = (ctx, shipState) => {
         ctx.lineTo(-3, 13);    // Was (-5, 20)
         ctx.closePath();
         ctx.stroke();
-    }
+}
+
+    ctx.restore();
+};
+
+// Add function to draw home position
+const drawHomePosition = (ctx, shipState) => {
+    const { homePosition, color } = shipState;
     
+    ctx.save();
+    ctx.translate(homePosition.x, homePosition.y);
+    
+    // Draw safe zone circle
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.setLineDash([5, 5]); // Dashed circle
+    ctx.lineWidth = 1;
+    ctx.arc(0, 0, SHIP_RADIUS * 2, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Draw home marker
+    ctx.beginPath();
+    ctx.setLineDash([]); // Solid lines
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    
+    // Draw 'H' symbol
+    ctx.moveTo(-5, -5);
+    ctx.lineTo(-5, 5);
+    ctx.moveTo(5, -5);
+    ctx.lineTo(5, 5);
+    ctx.moveTo(-5, 0);
+    ctx.lineTo(5, 0);
+    
+    ctx.stroke();
     ctx.restore();
 };
 
 // Add collectible drawing function
 const drawCollectible = (ctx, collectible) => {
+    const screenPos = worldToScreen(collectible.x, collectible.y);
+    
     ctx.save();
-    ctx.translate(collectible.x, collectible.y);
+    ctx.translate(screenPos.x, screenPos.y);
     
     ctx.beginPath();
     ctx.strokeStyle = collectible.color;
@@ -214,7 +291,22 @@ const handleKeyUp = (e) => {
 const gameLoop = () => {
     if (!isRunning.value) return;
     
-    canvasManager.value.drawStarfield();
+    // Update camera position to follow player's ship
+    if (ship.value) {
+        // Smooth camera movement
+        const targetX = ship.value.x;
+        const targetY = ship.value.y;
+        camera.value.x += (targetX - camera.value.x) * 0.1;
+        camera.value.y += (targetY - camera.value.y) * 0.1;
+    }
+    
+    // Clear and draw starfield
+    drawStarfield(canvasManager.value.ctx);
+    
+    // Draw home positions first (so they appear behind ships)
+    for (const [id, playerState] of Object.entries(gameState.value.players)) {
+        drawHomePosition(canvasManager.value.ctx, playerState);
+    }
     
     // Draw collectibles
     if (gameState.value.collectibles) {
