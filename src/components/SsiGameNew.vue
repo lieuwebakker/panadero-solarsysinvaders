@@ -9,6 +9,7 @@ console.log('🎮 Game Component: Loading');
 // Define game constants
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
+const SHIP_RADIUS = 10; // Changed from 15
 
 const props = defineProps({
     multiplayer: {
@@ -54,12 +55,20 @@ const initCanvas = () => {
 
 // In the script section, add a method to draw ships
 const drawShip = (ctx, shipState) => {
-    const { position, angle, color = '#FFFFFF' } = shipState; // Default to white if no color
-    console.log('Drawing ship with color:', color); // Debug log
+    const { position, angle, color = '#FFFFFF', isColliding } = shipState;
 
     ctx.save();
     ctx.translate(position.x, position.y);
     ctx.rotate(angle);
+    
+    // Draw collision indicator if colliding
+    if (isColliding) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 3;
+        ctx.arc(0, 0, SHIP_RADIUS + 5, 0, Math.PI * 2);
+        ctx.stroke();
+    }
     
     // Draw ship
     ctx.beginPath();
@@ -67,27 +76,83 @@ const drawShip = (ctx, shipState) => {
     ctx.fillStyle = color;
     ctx.lineWidth = 2;
     
-    // Ship shape
-    ctx.moveTo(0, -15);
-    ctx.lineTo(10, 15);
-    ctx.lineTo(0, 10);
-    ctx.lineTo(-10, 15);
+    // Ship shape - all values multiplied by 2/3
+    ctx.moveTo(0, -10);    // Was (0, -15)
+    ctx.lineTo(7, 10);     // Was (10, 15)
+    ctx.lineTo(0, 7);      // Was (0, 10)
+    ctx.lineTo(-7, 10);    // Was (-10, 15)
+    
     ctx.closePath();
     
     ctx.fill();
     ctx.stroke();
     
-    // Draw thrust if engine is on
+    // Adjust thrust flame size proportionally
     if (shipState.controls?.engineOn) {
         ctx.beginPath();
         ctx.strokeStyle = '#FF9900';
-        ctx.moveTo(0, 12);
-        ctx.lineTo(5, 20);
-        ctx.lineTo(0, 25);
-        ctx.lineTo(-5, 20);
+        ctx.moveTo(0, 8);      // Was (0, 12)
+        ctx.lineTo(3, 13);     // Was (5, 20)
+        ctx.lineTo(0, 17);     // Was (0, 25)
+        ctx.lineTo(-3, 13);    // Was (-5, 20)
         ctx.closePath();
         ctx.stroke();
     }
+    
+    ctx.restore();
+};
+
+// Add collectible drawing function
+const drawCollectible = (ctx, collectible) => {
+    ctx.save();
+    ctx.translate(collectible.x, collectible.y);
+    
+    ctx.beginPath();
+    ctx.strokeStyle = collectible.color;
+    ctx.fillStyle = collectible.color;
+    ctx.lineWidth = 2;
+    
+    // Draw based on type
+    switch(collectible.type) {
+        case 'star':
+            // Draw 5-pointed star
+            for(let i = 0; i < 5; i++) {
+                const angle = (i * 4 * Math.PI) / 5;
+                const x = Math.cos(angle) * collectible.radius;
+                const y = Math.sin(angle) * collectible.radius;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            }
+            break;
+            
+        case 'diamond':
+            // Draw diamond shape
+            ctx.moveTo(0, -collectible.radius);
+            ctx.lineTo(collectible.radius, 0);
+            ctx.lineTo(0, collectible.radius);
+            ctx.lineTo(-collectible.radius, 0);
+            break;
+            
+        case 'orb':
+            // Draw circle
+            ctx.arc(0, 0, collectible.radius, 0, Math.PI * 2);
+            break;
+    }
+    
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    // Add sparkle effect
+    const time = Date.now() / 1000;
+    const sparkleSize = Math.sin(time * 4) * 3 + 5;
+    ctx.beginPath();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1;
+    ctx.moveTo(-sparkleSize, 0);
+    ctx.lineTo(sparkleSize, 0);
+    ctx.moveTo(0, -sparkleSize);
+    ctx.lineTo(0, sparkleSize);
+    ctx.stroke();
     
     ctx.restore();
 };
@@ -150,6 +215,13 @@ const gameLoop = () => {
     if (!isRunning.value) return;
     
     canvasManager.value.drawStarfield();
+    
+    // Draw collectibles
+    if (gameState.value.collectibles) {
+        for (const collectible of Object.values(gameState.value.collectibles)) {
+            drawCollectible(canvasManager.value.ctx, collectible);
+        }
+    }
     
     // Debug log the game state
     console.log('Current game state:', gameState.value);

@@ -19,7 +19,7 @@ export class CanvasManager {
             }
             
             // Initialize canvas with correct size
-            this.setCanvasSize(width, height);
+        this.setCanvasSize(width, height);
             
             // Initialize stars
             this.stars = this.generateStars();
@@ -120,7 +120,7 @@ export class CanvasManager {
         if (this.ctx) {
             // Clear the canvas before destroying
             this.ctx.clearRect(0, 0, this.width, this.height);
-            this.ctx = null;
+        this.ctx = null;
         }
         this.mainCanvas = null;
         this.stars = null;
