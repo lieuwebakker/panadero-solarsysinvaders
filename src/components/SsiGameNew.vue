@@ -4,10 +4,14 @@
         
         <!-- Info panel -->
         <div v-if="shipInfo" class="info-panel">
-            <div>Position: ({{ shipInfo.position.x }}, {{ shipInfo.position.y }})</div>
-            <div>Angle: {{ shipInfo.angle }}°</div>
-            <div>Velocity: ({{ shipInfo.velocity.x }}, {{ shipInfo.velocity.y }})</div>
-            <div>Home: ({{ shipInfo.home.x }}, {{ shipInfo.home.y }})</div>
+            <div class="info-row">Position: <span class="value">{{ shipInfo.position.x.toString().padStart(6) }}, {{ shipInfo.position.y.toString().padStart(6) }}</span></div>
+            <div class="info-row">Angle: <span class="value">{{ shipInfo.angle.toString().padStart(6) }}°</span></div>
+            <div class="info-row">Velocity: <span class="value">{{ shipInfo.velocity.x.toString().padStart(6) }}, {{ shipInfo.velocity.y.toString().padStart(6) }}</span></div>
+            <div class="info-row">Home: <span class="value">{{ shipInfo.home.x.toString().padStart(6) }}, {{ shipInfo.home.y.toString().padStart(6) }}</span></div>
+            <div class="info-row">Score: <span class="value">{{ score.toString().padStart(6) }}</span></div>
+            <div class="info-row">Pattern: <span class="value">{{ shipInfo.pattern.padEnd(6) }}</span></div>
+            <div class="info-row">Team: <span class="value">{{ shipInfo.color.padEnd(6) }}</span></div>
+            <div class="info-row">Safe Zone: <span class="value">{{ inSafeZone ? 'Yes' : 'No' }}</span></div>
         </div>
     </div>
 </template>
@@ -109,18 +113,27 @@ const { gameState, isConnected, connect, sendInput, socket } = useMultiplayer({
     serverUrl: props.serverUrl
 });
 
-// Add new refs for info panel
-const shipInfo = ref({
-    position: { x: 0, y: 0 },
-    angle: 0,
-    velocity: { x: 0, y: 0 },
-    controls: {
-        rotatingLeft: false,
-        rotatingRight: false,
-        engineOn: false
-    },
-    home: { x: 0, y: 0 } // Added home position to shipInfo
-});
+// Initialize refs at the top of the script
+const shipInfo = ref(null);  // Changed from an object to null initially
+const score = ref(0);
+
+// Add this ref for safe zone status
+const inSafeZone = ref(false);
+
+// Add this function before the gameLoop
+const isInSafeZone = (x, y, playerId) => {
+    if (!gameState.value?.homePositions) return false;
+    
+    for (const [homeId, homePos] of Object.entries(gameState.value.homePositions)) {
+        const dx = Math.abs(x - homePos.x);
+        const dy = Math.abs(y - homePos.y);
+        // Check if position is within safe zone (300 units)
+        if (dx <= 150 && dy <= 150) { // 300/2 = 150 units from center
+            return true;
+        }
+    }
+    return false;
+};
 
 const initCanvas = () => {
     console.log('🎮 Initializing canvas');
@@ -421,42 +434,77 @@ const gameLoop = () => {
             ship.value.angle = playerState.angle;
             ship.value.velocity = playerState.velocity;
             
+            // Update all ship info including home position
             shipInfo.value = {
                 position: { 
                     x: Math.round(playerState.position.x), 
                     y: Math.round(playerState.position.y) 
                 },
-                home: {  // Add this
-                    x: Math.round(playerState.home.x),
-                    y: Math.round(playerState.home.y)
-                },
+                home: playerState.home,  // Make sure home position is included
                 angle: Math.round(playerState.angle * 180 / Math.PI),
                 velocity: { 
                     x: playerState.velocity.x.toFixed(2), 
                     y: playerState.velocity.y.toFixed(2) 
                 },
                 controls: playerState.controls,
-                color: playerState.color
+                color: playerState.color,
+                pattern: playerState.pattern,
+                score: playerState.score || 0
             };
+            
+            // Update safe zone status
+            inSafeZone.value = isInSafeZone(
+                playerState.position.x, 
+                playerState.position.y,
+                socket.value.id
+            );
+            
+            // Update score
+            score.value = playerState.score || 0;
         }
     }
     
     requestAnimationFrame(gameLoop);
 };
 
+// Add initial state setup in onMounted
 onMounted(() => {
     console.log('🎮 Game Component: Mounted');
     if (initCanvas()) {
         console.log('🎮 Canvas initialized');
         isRunning.value = true;
+        
+        // Initialize shipInfo with default values
+        shipInfo.value = {
+            position: { x: 0, y: 0 },
+            home: { x: 0, y: 0 },
+            angle: 0,
+            velocity: { x: '0.00', y: '0.00' },
+            controls: {
+                rotatingLeft: false,
+                rotatingRight: false,
+                engineOn: false
+            },
+            color: '#FFFFFF',
+            pattern: 'fighter'
+        };
+        console.log('Initial shipInfo set:', shipInfo.value);
+        
         gameLoop();
         if (props.multiplayer) {
             console.log('🎮 Connecting to multiplayer...');
             connect();
         }
-        // Add keyboard controls
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+
+        // Add shoot blocked handler
+        socket.value.on('shoot_blocked', (data) => {
+            if (data.reason === 'in_safe_zone') {
+                console.log('Cannot shoot in safe zones!');
+                // Optional: Add visual feedback here
+            }
+        });
     }
 });
 
@@ -477,19 +525,48 @@ onUnmounted(() => {
 }
 
 .game-canvas {
-    width: 100%;
-    height: 100%;
-    background: black;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
 .info-panel {
     position: absolute;
-    top: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 10px;
-    border-radius: 5px;
-    font-family: monospace;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.3);  /* Increased transparency (0.3 from 0.5) */
+    color: #33FF33;
+    font-family: 'Courier New', monospace;
+    padding: 12px 15px;  /* Reduced padding */
+    border-radius: 8px;
+    border: 1px solid rgba(51, 255, 51, 0.5);  /* Thinner, more transparent border */
+    font-size: 14px;
+    line-height: 1.6;
+    min-width: 240px;  /* Reduced from 300px */
+    max-width: 240px;  /* Added max-width to ensure consistent size */
+    box-shadow: 0 0 10px rgba(51, 255, 51, 0.15);  /* More transparent shadow */
+    backdrop-filter: blur(2px);  /* Reduced blur effect */
+}
+
+.info-row {
+    margin: 4px 0;
+    display: flex;
+    justify-content: space-between;
+    white-space: pre;
+}
+
+.label {
+    color: rgba(51, 255, 51, 0.9);  /* Slightly transparent green */
+    font-size: 13px;  /* Slightly larger than values for contrast */
+}
+
+.value {
+    color: rgba(255, 255, 255, 0.95);  /* Kept text mostly opaque for readability */
+    text-shadow: 0 0 5px rgba(51, 255, 51, 0.5);  /* More transparent glow */
+    font-family: 'Courier New', monospace;
+    font-size: 12px;  /* Reduced from 14px */
+    min-width: 120px;  /* Reduced from 160px */
+    text-align: right;
+    display: inline-block;
 }
 </style> 
