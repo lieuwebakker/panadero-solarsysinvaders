@@ -46,28 +46,48 @@ const drawStarfield = (ctx) => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Create grid of stars that moves with camera
-    const gridSize = 200;
-    const starDensity = 0.1;
-    
-    const startX = Math.floor(camera.value.x / gridSize) * gridSize;
-    const startY = Math.floor(camera.value.y / gridSize) * gridSize;
-    
-    for (let x = startX - GAME_WIDTH; x < startX + GAME_WIDTH * 2; x += gridSize) {
-        for (let y = startY - GAME_HEIGHT; y < startY + GAME_HEIGHT * 2; y += gridSize) {
-            // Use position as seed for deterministic randomness
-            const seed = Math.abs(Math.sin(x * 0.5 + y * 0.3) * 10000);
-            if (seed % 1 < starDensity) {
-                const screenPos = worldToScreen(x + (seed * gridSize), y + (seed * gridSize * 1.5));
-                
-                ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + (seed % 0.7)})`;
-                ctx.beginPath();
-                ctx.arc(screenPos.x, screenPos.y, 1 + (seed % 2), 0, Math.PI * 2);
-                ctx.fill();
+    const layers = [
+        { count: 30, parallax: 0.01, size: 0.8, brightness: 0.2 },
+        { count: 25, parallax: 0.02, size: 1.0, brightness: 0.3 },
+        { count: 20, parallax: 0.029, size: 1.3, brightness: 0.5 },
+        { count: 15, parallax: 0.045, size: 1.7, brightness: 0.7 },
+        { count: 10, parallax: 0.059, size: 2.0, brightness: 0.9 }
+    ];
+
+    const time = Date.now() * 0.001;
+
+    layers.forEach((layer, layerIndex) => {
+        const viewX = camera.value.x * layer.parallax;
+        const viewY = camera.value.y * layer.parallax;
+        
+        const areaSize = GAME_WIDTH * 2;
+        const startX = Math.floor(viewX / areaSize) * areaSize;
+        const startY = Math.floor(viewY / areaSize) * areaSize;
+
+        for (let areaX = startX - areaSize; areaX <= startX + areaSize; areaX += areaSize) {
+            for (let areaY = startY - areaSize; areaY <= startY + areaSize; areaY += areaSize) {
+                for (let i = 0; i < layer.count; i++) {
+                    const seed = (areaX + areaY * 1000 + i * 100 + layerIndex * 10000);
+                    const x = areaX + Math.abs(Math.sin(seed * 0.37)) * areaSize;
+                    const y = areaY + Math.abs(Math.cos(seed * 0.23)) * areaSize;
+                    
+                    const starX = x - viewX;
+                    const starY = y - viewY;
+                    
+                    const flickerRate = 0.3 + (Math.sin(seed * 0.37) * 0.3);
+                    const flickerAmount = 0.25 + (Math.cos(seed * 0.23) * 0.15);
+                    const flicker = Math.sin(time * flickerRate + seed) * flickerAmount + 0.8;
+                    const alpha = layer.brightness * flicker;
+                    
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(starX, starY, layer.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
             }
         }
-    }
-};
+    });
+}
 
 // Initialize multiplayer
 const { gameState, isConnected, connect, sendShipState, sendInput, socket } = useMultiplayer({
@@ -90,8 +110,14 @@ const shipInfo = ref({
 const initCanvas = () => {
     console.log('🎮 Initializing canvas');
     if (!canvas.value) return false;
-    canvasManager.value = new CanvasManager(canvas.value);
-    // Initialize ship in the center of the screen
+    
+    // Set both the canvas element AND its drawing context size
+    canvas.value.style.width = `${GAME_WIDTH}px`;
+    canvas.value.style.height = `${GAME_HEIGHT}px`;
+    canvas.value.width = GAME_WIDTH;  // Important: this sets the drawing context size
+    canvas.value.height = GAME_HEIGHT;
+    
+    canvasManager.value = new CanvasManager(canvas.value, GAME_WIDTH, GAME_HEIGHT);
     ship.value = new Ship(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT);
     return true;
 };
