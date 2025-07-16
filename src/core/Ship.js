@@ -15,17 +15,20 @@ export class Ship {
     }
 
     move() {
-        // Rotation
-        if (this.rotatingLeft) this.angle -= 0.1;
-        if (this.rotatingRight) this.angle += 0.1;
+        // Get time since last frame (default to 1/60 if not provided)
+        const deltaTime = 1/60;
+        
+        // Rotation with time-based movement
+        if (this.rotatingLeft) this.angle -= 0.1 * deltaTime * 60;
+        if (this.rotatingRight) this.angle += 0.1 * deltaTime * 60;
 
-        // Thrust
+        // Thrust with time-based movement
         if (this.engineOn) {
-            this.velocity.x += Math.sin(this.angle) * 0.1;
-            this.velocity.y -= Math.cos(this.angle) * 0.1;
+            this.velocity.x += Math.sin(this.angle) * 0.1 * deltaTime * 60;
+            this.velocity.y -= Math.cos(this.angle) * 0.1 * deltaTime * 60;
         }
 
-        // Move
+        // Move with current velocity
         this.x += this.velocity.x;
         this.y += this.velocity.y;
 
@@ -34,8 +37,8 @@ export class Ship {
         this.y = ((this.y % this.gameHeight) + this.gameHeight) % this.gameHeight;
 
         // Add drag
-        this.velocity.x *= 0.99;
-        this.velocity.y *= 0.99;
+        this.velocity.x *= Math.pow(0.99, deltaTime * 60);
+        this.velocity.y *= Math.pow(0.99, deltaTime * 60);
     }
 
     draw(ctx) {
