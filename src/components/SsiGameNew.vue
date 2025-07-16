@@ -130,44 +130,55 @@ const drawShip = (ctx, shipState) => {
     ctx.translate(screenPos.x, screenPos.y);
     ctx.rotate(shipState.angle);
     
-    // Draw collision indicator if colliding
-    if (shipState.isColliding) {
-        ctx.beginPath();
-        ctx.strokeStyle = '#FF0000';
-        ctx.lineWidth = 3;
-        ctx.arc(0, 0, SHIP_RADIUS + 5, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-    
-    // Draw ship
-    ctx.beginPath();
     ctx.strokeStyle = shipState.color;
     ctx.fillStyle = shipState.color;
     ctx.lineWidth = 2;
     
-    // Ship shape - all values multiplied by 2/3
-    ctx.moveTo(0, -10);    // Was (0, -15)
-    ctx.lineTo(7, 10);     // Was (10, 15)
-    ctx.lineTo(0, 7);      // Was (0, 10)
-    ctx.lineTo(-7, 10);    // Was (-10, 15)
+    if (shipState.pattern === 'ufo') {
+        // UFO shape
+        // Main saucer body
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 15, 6, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fill();
+        
+        // Top dome
+        ctx.beginPath();
+        ctx.arc(0, -3, 8, Math.PI, 0, false);
+        ctx.stroke();
+        ctx.fill();
+        
+        // Bottom lights
+        [-10, -5, 0, 5, 10].forEach(x => {
+            ctx.beginPath();
+            ctx.arc(x, 2, 1, 0, Math.PI * 2);
+            ctx.fillStyle = 'white';
+            ctx.fill();
+        });
+    } else {
+        // Default fighter shape
+        ctx.beginPath();
+        ctx.moveTo(0, -10);
+        ctx.lineTo(7, 10);
+        ctx.lineTo(0, 7);
+        ctx.lineTo(-7, 10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+    }
     
-    ctx.closePath();
-    
-    ctx.fill();
-    ctx.stroke();
-    
-    // Adjust thrust flame size proportionally
+    // Draw engine flame if active
     if (shipState.controls?.engineOn) {
         ctx.beginPath();
         ctx.strokeStyle = '#FF9900';
-        ctx.moveTo(0, 8);      // Was (0, 12)
-        ctx.lineTo(3, 13);     // Was (5, 20)
-        ctx.lineTo(0, 17);     // Was (0, 25)
-        ctx.lineTo(-3, 13);    // Was (-5, 20)
+        ctx.moveTo(0, 8);
+        ctx.lineTo(3, 13);
+        ctx.lineTo(0, 17);
+        ctx.lineTo(-3, 13);
         ctx.closePath();
         ctx.stroke();
-}
-
+    }
+    
     ctx.restore();
 };
 
@@ -249,6 +260,33 @@ const drawCollectible = (ctx, collectible) => {
     ctx.restore();
 };
 
+// Add function to draw safe zones
+const drawSafeZone = (ctx, homePosition) => {
+    // Convert world coordinates to screen coordinates
+    const screenPos = worldToScreen(homePosition.x, homePosition.y);
+    
+    ctx.save();
+    ctx.translate(screenPos.x, screenPos.y);
+    
+    // Safe zone box reduced to 300 units
+    const safeZoneSize = 300;
+    ctx.strokeStyle = homePosition.color || '#FFFFFF';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    
+    ctx.beginPath();
+    ctx.rect(
+        -safeZoneSize/2, 
+        -safeZoneSize/2, 
+        safeZoneSize, 
+        safeZoneSize
+    );
+    ctx.stroke();
+    
+    ctx.setLineDash([]);
+    ctx.restore();
+}
+
 // Current key handlers need to be fixed to match the server's expected input types
 function handleKeyDown(event) {
     switch(event.key) {
@@ -303,7 +341,8 @@ const gameLoop = () => {
     // Draw home positions first (so they appear behind ships)
     if (gameState.value.homePositions) {
         for (const homePosition of Object.values(gameState.value.homePositions)) {
-            drawHome(canvasManager.value.ctx, homePosition);
+            drawSafeZone(canvasManager.value.ctx, homePosition);  // Draw safe zone first
+            drawHome(canvasManager.value.ctx, homePosition);      // Then draw home box on top
         }
     }
     
