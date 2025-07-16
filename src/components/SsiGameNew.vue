@@ -46,12 +46,13 @@ const drawStarfield = (ctx) => {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
+    // Update the star layers with higher counts
     const layers = [
-        { count: 30, parallax: 0.01, size: 0.8, brightness: 0.2 },
-        { count: 25, parallax: 0.02, size: 1.0, brightness: 0.3 },
-        { count: 20, parallax: 0.029, size: 1.3, brightness: 0.5 },
-        { count: 15, parallax: 0.045, size: 1.7, brightness: 0.7 },
-        { count: 10, parallax: 0.059, size: 2.0, brightness: 0.9 }
+        { count: 60,  parallax: 0.01, size: 0.8, brightness: 0.2 },  // Doubled from 30
+        { count: 50,  parallax: 0.02, size: 1.0, brightness: 0.3 },  // Doubled from 25
+        { count: 40,  parallax: 0.029, size: 1.3, brightness: 0.5 }, // Doubled from 20
+        { count: 30,  parallax: 0.045, size: 1.7, brightness: 0.7 }, // Doubled from 15
+        { count: 20,  parallax: 0.059, size: 2.0, brightness: 0.9 }  // Doubled from 10
     ];
 
     const time = Date.now() * 0.001;
@@ -148,11 +149,11 @@ const drawShip = (ctx, shipState) => {
         ctx.stroke();
         ctx.fill();
         
-        // Bottom lights
+        // Bottom lights - changed to black
         [-10, -5, 0, 5, 10].forEach(x => {
             ctx.beginPath();
             ctx.arc(x, 2, 1, 0, Math.PI * 2);
-            ctx.fillStyle = 'white';
+            ctx.fillStyle = 'black';  // Changed from 'white' to 'black'
             ctx.fill();
         });
     } else {
