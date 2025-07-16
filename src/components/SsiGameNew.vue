@@ -18,7 +18,7 @@ const props = defineProps({
     },
     serverUrl: {
         type: String,
-        default: 'http://localhost:3000'
+        default: 'http://192.168.2.20:8000/home/solarsys'
     }
 });
 
