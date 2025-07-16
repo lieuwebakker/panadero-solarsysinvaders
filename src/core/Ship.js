@@ -12,6 +12,29 @@ export class Ship {
         this.velocity = { x: 0, y: 0 };
         // Add pattern property with random assignment
         this.pattern = Math.random() < 0.5 ? 'fighter' : 'ufo';
+        
+        // Add bullet properties
+        this.bullets = [];
+        this.lastShot = 0;
+        this.shootDelay = 250; // Minimum time between shots (ms)
+    }
+
+    shoot() {
+        const now = Date.now();
+        if (now - this.lastShot >= this.shootDelay) {
+            // Create new bullet at ship's position
+            const bullet = new Bullet(
+                this.x,
+                this.y,
+                this.angle,
+                10,
+                this.color || '#FFFF00'
+            );
+            this.bullets.push(bullet);
+            this.lastShot = now;
+            return true;
+        }
+        return false;
     }
 
     move() {
@@ -39,6 +62,10 @@ export class Ship {
         // Add drag
         this.velocity.x *= Math.pow(0.99, deltaTime * 60);
         this.velocity.y *= Math.pow(0.99, deltaTime * 60);
+
+        // Update bullets
+        this.bullets = this.bullets.filter(bullet => bullet.active);
+        this.bullets.forEach(bullet => bullet.move());
     }
 
     draw(ctx) {
@@ -101,6 +128,9 @@ export class Ship {
             }
         }
         
+        // Draw bullets
+        this.bullets.forEach(bullet => bullet.draw(ctx));
+
         ctx.restore();
     }
 }

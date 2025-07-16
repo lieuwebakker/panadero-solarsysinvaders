@@ -1,3 +1,17 @@
+<template>
+    <div class="game-container">
+        <canvas ref="canvas" class="game-canvas"></canvas>
+        
+        <!-- Info panel -->
+        <div v-if="shipInfo" class="info-panel">
+            <div>Position: ({{ shipInfo.position.x }}, {{ shipInfo.position.y }})</div>
+            <div>Angle: {{ shipInfo.angle }}°</div>
+            <div>Velocity: ({{ shipInfo.velocity.x }}, {{ shipInfo.velocity.y }})</div>
+            <div>Home: ({{ shipInfo.home.x }}, {{ shipInfo.home.y }})</div>
+        </div>
+    </div>
+</template>
+
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Ship } from '../core/Ship';
@@ -18,7 +32,7 @@ const props = defineProps({
     },
     serverUrl: {
         type: String,
-        default: 'http://192.168.2.20:8000/home/solarsys'
+        default: import.meta.env.VITE_GAME_SERVER_URL
     }
 });
 
@@ -91,7 +105,7 @@ const drawStarfield = (ctx) => {
 }
 
 // Initialize multiplayer
-const { gameState, isConnected, connect, sendShipState, sendInput, socket } = useMultiplayer({
+const { gameState, isConnected, connect, sendInput, socket } = useMultiplayer({
     serverUrl: props.serverUrl
 });
 
@@ -288,8 +302,30 @@ const drawSafeZone = (ctx, homePosition) => {
     ctx.restore();
 }
 
-// Current key handlers need to be fixed to match the server's expected input types
+// Update the bullet drawing function
+const drawBullet = (ctx, bullet) => {
+    if (!bullet || typeof bullet.x !== 'number' || typeof bullet.y !== 'number') {
+        console.warn('Invalid bullet data:', bullet);
+        return;
+    }
+
+    const screenPos = worldToScreen(bullet.x, bullet.y);
+    
+    ctx.save();
+    ctx.translate(screenPos.x, screenPos.y);
+    
+    // Make bullets more visible
+    ctx.fillStyle = bullet.color || '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2); // Slightly larger radius
+    ctx.fill();
+    
+    ctx.restore();
+};
+
+// Update handleKeyDown to include space for shooting
 function handleKeyDown(event) {
+    console.log('Key down event:', event.key); // Debug log
     switch(event.key) {
         case 'ArrowLeft':
             sendInput('rotate_left', true);
@@ -300,9 +336,12 @@ function handleKeyDown(event) {
         case 'ArrowUp':
             sendInput('thrust', true);
             break;
+        case ' ': // Space key
+            console.log('Space key pressed - sending shoot input'); // Debug log
+            sendInput('shoot', true);
+            break;
         case 'h':
         case 'H':
-            // Send warp home command when H is pressed
             sendInput('warp_home', true);
             break;
     }
@@ -319,7 +358,9 @@ function handleKeyUp(event) {
         case 'ArrowUp':
             sendInput('thrust', false);
             break;
-        // No need for keyup on 'H' since it's an instant action
+        case ' ': // Add space key up handler
+            sendInput('shoot', false);
+            break;
     }
 }
 
@@ -352,6 +393,17 @@ const gameLoop = () => {
         for (const collectible of Object.values(gameState.value.collectibles)) {
             drawCollectible(canvasManager.value.ctx, collectible);
         }
+    }
+
+    // Debug log bullets before rendering
+    console.log('Current game state bullets:', gameState.value.bullets);
+
+    // Draw bullets with debug logging
+    if (gameState.value?.bullets) {
+        console.log('Drawing bullets:', gameState.value.bullets);
+        gameState.value.bullets.forEach(bullet => {
+            drawBullet(canvasManager.value.ctx, bullet);
+        });
     }
     
     // Debug log the game state
@@ -409,7 +461,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-    console.log('🎮 Game Component: Unmounting');
+    console.log(' Game Component: Unmounting');
     isRunning.value = false;
     // Remove keyboard controls
     window.removeEventListener('keydown', handleKeyDown);
@@ -417,112 +469,27 @@ onUnmounted(() => {
 });
 </script>
 
-<template>
-    <div class="game-wrapper">
-        <canvas ref="canvas" :width="GAME_WIDTH" :height="GAME_HEIGHT"></canvas>
-        <div class="info-panel">
-            <div class="info-section">
-                <h3>Ship Status</h3>
-                <div class="info-row">
-                    <span class="info-label">Color:</span>
-                    <span class="info-value" :style="{ color: shipInfo.color }">■</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Position:</span>
-                    <span class="info-value">X:{{ shipInfo.position.x }}</span>
-                    <span class="info-value">Y:{{ shipInfo.position.y }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Home:</span>
-                    <span class="info-value">X:{{ shipInfo.home.x }}</span>
-                    <span class="info-value">Y:{{ shipInfo.home.y }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Angle:</span>
-                    <span class="info-value">{{ shipInfo.angle }}°</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Velocity:</span>
-                    <span class="info-value">X:{{ shipInfo.velocity.x }}</span>
-                    <span class="info-value">Y:{{ shipInfo.velocity.y }}</span>
-                </div>
-            </div>
-            <div class="info-section">
-                <h3>Controls</h3>
-                <div class="info-row">
-                    <span class="info-label">Left:</span>
-                    <span class="info-value">{{ shipInfo.controls.rotatingLeft ? '✓' : '×' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Right:</span>
-                    <span class="info-value">{{ shipInfo.controls.rotatingRight ? '✓' : '×' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Thrust:</span>
-                    <span class="info-value">{{ shipInfo.controls.engineOn ? '✓' : '×' }}</span>
-                </div>
-            </div>
-            <div class="info-section">
-                <h3>Network</h3>
-                <div class="info-row">
-                    <span class="info-label">Connected:</span>
-                    <span class="info-value">{{ isConnected ? '✓' : '×' }}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Status:</span>
-                    <span class="info-value">{{ gameState.status }}</span>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
 <style scoped>
-.game-wrapper {
+.game-container {
+    position: relative;
     width: 800px;
     height: 600px;
-    overflow: hidden;
-    position: relative;
+}
+
+.game-canvas {
+    width: 100%;
+    height: 100%;
+    background: black;
 }
 
 .info-panel {
     position: absolute;
     top: 10px;
-    right: 10px;
+    left: 10px;
     background: rgba(0, 0, 0, 0.7);
-    color: #00ff00;
-    font-family: monospace;
+    color: white;
     padding: 10px;
-    border: 1px solid #00ff00;
-    border-radius: 4px;
-    font-size: 12px;
-    z-index: 100;
-}
-
-.info-section {
-    margin-bottom: 10px;
-}
-
-.info-section h3 {
-    color: #00ff00;
-    margin: 0 0 5px 0;
-    font-size: 14px;
-    border-bottom: 1px solid #00ff00;
-}
-
-.info-row {
-    display: flex;
-    margin: 2px 0;
-    align-items: center;
-}
-
-.info-label {
-    min-width: 70px;
-}
-
-.info-value {
-    min-width: 60px;
-    text-align: right;
-    padding: 0 5px;
+    border-radius: 5px;
+    font-family: monospace;
 }
 </style> 
