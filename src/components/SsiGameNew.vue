@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { Ship } from '../core/Ship';
 import { CanvasManager } from '../core/Canvas';
 import { useMultiplayer } from '../composables/useMultiplayer';
+import GameMinimap from './GameMinimap.vue'; // Add this import
 
 console.log('🎮 Game Component: Loading');
 
@@ -655,6 +656,7 @@ const infoItems = computed(() => [
     <div class="game-container">
         <canvas ref="canvas" class="game-canvas"></canvas>
         
+        <!-- Info Panel -->
         <div v-if="shipInfo" class="absolute top-5 left-5 bg-black/30 text-green-400 p-2 rounded-lg border border-green-500 w-32 backdrop-blur-sm text-xxs">
             <div v-for="(item, index) in infoItems" 
                  :key="index"
@@ -665,6 +667,15 @@ const infoItems = computed(() => [
                 ]">{{ item.value() }}</span>
             </div>
         </div>
+
+        <!-- Minimap Component -->
+        <GameMinimap 
+            :game-state="gameState"
+            :player-id="socket?.id"
+            :size="150"
+            :world-width="8000"
+            :world-height="6000"
+        />
     </div>
 </template>
 
