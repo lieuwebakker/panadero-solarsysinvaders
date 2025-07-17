@@ -4,6 +4,7 @@ import { Ship } from '../core/Ship';
 import { CanvasManager } from '../core/Canvas';
 import { useMultiplayer } from '../composables/useMultiplayer';
 import GameMinimap from './GameMinimap.vue'; // Add this import
+import GameInfoPanel from './GameInfoPanel.vue';
 
 console.log('🎮 Game Component: Loading');
 
@@ -131,18 +132,6 @@ const initCanvas = () => {
     canvasManager.value = new CanvasManager(canvas.value, GAME_WIDTH, GAME_HEIGHT);
     ship.value = new Ship(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT);
     return true;
-};
-
-// Add these formatting functions at the script level
-const formatNumber = (num, width) => {
-    if (typeof num === 'number') {
-        return num.toString().padStart(width, ' ');
-    }
-    return ''.padStart(width, ' ');
-};
-
-const padString = (str, width) => {
-    return (str || '').toString().padEnd(width, ' ');
 };
 
 // Update ship drawing to use camera transform
@@ -657,24 +646,18 @@ const infoItems = computed(() => [
         <canvas ref="canvas" class="game-canvas"></canvas>
         
         <!-- Info Panel -->
-        <div v-if="shipInfo" class="absolute top-3 left-3 bg-black/30 text-green-400 p-2 rounded-lg border border-green-500 w-32 backdrop-blur-sm text-xxs">
-            <div v-for="(item, index) in infoItems" 
-                 :key="index"
-                 class="flex justify-between items-center whitespace-pre text-xxs -my-1">
-                <span class="text-white">
-                    {{ item.label }}:
-                </span>
-                <span :class="['text-right min-w-[60px] ',]">
-                    {{ item.value() }}
-                </span>
-            </div>
-        </div>
+        <GameInfoPanel 
+            v-if="shipInfo"
+            :ship-info="shipInfo"
+            :score="score"
+            :in-safe-zone="inSafeZone"
+        />
 
         <!-- Minimap Component -->
         <GameMinimap 
             :game-state="gameState"
             :player-id="socket?.id"
-            :size="175"
+            :size="150"
             :world-width="8000"
             :world-height="6000"
         />

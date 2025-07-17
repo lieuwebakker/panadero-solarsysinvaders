@@ -1,4 +1,30 @@
 // src/core/Ship.js
+// Define ship type configurations at the top of the file
+const SHIP_CONFIGS = {
+    fighter: {
+        shootDelay: 150,
+        speed: 0.1,
+        turnSpeed: 0.1,
+        drag: 0.99,
+        health: 100
+    },
+    ufo: {
+        shootDelay: 250,
+        speed: 0.08,
+        turnSpeed: 0.08,
+        drag: 0.995,
+        health: 120
+    }
+    // Easy to add new ship types:
+    // interceptor: {
+    //     shootDelay: 100,
+    //     speed: 0.12,
+    //     turnSpeed: 0.15,
+    //     drag: 0.98,
+    //     health: 80
+    // }
+};
+
 export class Ship {
     constructor(x, y, gameWidth = 600, gameHeight = 400) {
         this.x = x;
@@ -13,10 +39,17 @@ export class Ship {
         // Add pattern property with random assignment
         this.pattern = Math.random() < 0.5 ? 'fighter' : 'ufo';
         
+        // Apply ship type configuration
+        const config = SHIP_CONFIGS[this.pattern];
+        this.shootDelay = config.shootDelay;
+        this.speed = config.speed;
+        this.turnSpeed = config.turnSpeed;
+        this.drag = config.drag;
+        this.health = config.health;
+        
         // Add bullet properties
         this.bullets = [];
         this.lastShot = 0;
-        this.shootDelay = 250; // Minimum time between shots (ms)
     }
 
     shoot() {
@@ -42,13 +75,13 @@ export class Ship {
         const deltaTime = 1/60;
         
         // Rotation with time-based movement
-        if (this.rotatingLeft) this.angle -= 0.1 * deltaTime * 60;
-        if (this.rotatingRight) this.angle += 0.1 * deltaTime * 60;
+        if (this.rotatingLeft) this.angle -= this.turnSpeed * deltaTime * 60;
+        if (this.rotatingRight) this.angle += this.turnSpeed * deltaTime * 60;
 
         // Thrust with time-based movement
         if (this.engineOn) {
-            this.velocity.x += Math.sin(this.angle) * 0.1 * deltaTime * 60;
-            this.velocity.y -= Math.cos(this.angle) * 0.1 * deltaTime * 60;
+            this.velocity.x += Math.sin(this.angle) * this.speed * deltaTime * 60;
+            this.velocity.y -= Math.cos(this.angle) * this.speed * deltaTime * 60;
         }
 
         // Move with current velocity
@@ -60,8 +93,8 @@ export class Ship {
         this.y = ((this.y % this.gameHeight) + this.gameHeight) % this.gameHeight;
 
         // Add drag
-        this.velocity.x *= Math.pow(0.99, deltaTime * 60);
-        this.velocity.y *= Math.pow(0.99, deltaTime * 60);
+        this.velocity.x *= Math.pow(this.drag, deltaTime * 60);
+        this.velocity.y *= Math.pow(this.drag, deltaTime * 60);
 
         // Update bullets
         this.bullets = this.bullets.filter(bullet => bullet.active);
