@@ -2,15 +2,20 @@
     <div class="game-container">
         <canvas ref="canvas" class="game-canvas"></canvas>
         
-        <!-- Info panel -->
+        <!-- Info panel with fixed-width values -->
         <div v-if="shipInfo" class="info-panel">
-            <div class="info-row">Position: <span class="value">{{ shipInfo.position.x.toString().padStart(6) }}, {{ shipInfo.position.y.toString().padStart(6) }}</span></div>
-            <div class="info-row">Angle: <span class="value">{{ shipInfo.angle.toString().padStart(6) }}°</span></div>
-            <div class="info-row">Velocity: <span class="value">{{ shipInfo.velocity.x.toString().padStart(6) }}, {{ shipInfo.velocity.y.toString().padStart(6) }}</span></div>
-            <div class="info-row">Home: <span class="value">{{ shipInfo.home.x.toString().padStart(6) }}, {{ shipInfo.home.y.toString().padStart(6) }}</span></div>
-            <div class="info-row">Score: <span class="value">{{ score.toString().padStart(6) }}</span></div>
-            <div class="info-row">Pattern: <span class="value">{{ shipInfo.pattern.padEnd(6) }}</span></div>
-            <div class="info-row">Team: <span class="value">{{ shipInfo.color.padEnd(6) }}</span></div>
+            <div class="info-row"><span class="label">Call:</span> <span class="value">{{ padString(shipInfo.callSign, 6) }}</span></div>
+            <div class="info-row">
+                <span class="label">Health:</span> 
+                <span class="value">{{ formatNumber(shipInfo.health, 3) }}/{{ formatNumber(shipInfo.maxHealth, 3) }}</span>
+            </div>
+            <div class="info-row"><span class="label">Position:</span> <span class="value">{{ formatNumber(shipInfo.position.x, 6) }}, {{ formatNumber(shipInfo.position.y, 6) }}</span></div>
+            <div class="info-row"><span class="label">Angle:</span> <span class="value">{{ formatNumber(shipInfo.angle, 6) }}°</span></div>
+            <div class="info-row"><span class="label">Velocity:</span> <span class="value">{{ formatNumber(shipInfo.velocity.x, 6) }}, {{ formatNumber(shipInfo.velocity.y, 6) }}</span></div>
+            <div class="info-row"><span class="label">Home:</span> <span class="value">{{ formatNumber(shipInfo.home.x, 6) }}, {{ formatNumber(shipInfo.home.y, 6) }}</span></div>
+            <div class="info-row"><span class="label">Score:</span> <span class="value">{{ formatNumber(score, 6) }}</span></div>
+            <div class="info-row"><span class="label">Pattern:</span> <span class="value">{{ padString(shipInfo.pattern, 6) }}</span></div>
+            <div class="info-row"><span class="label">Team:</span> <span class="value">{{ padString(shipInfo.color, 6) }}</span></div>
             <div class="info-row">Safe Zone: <span class="value">{{ inSafeZone ? 'Yes' : 'No' }}</span></div>
         </div>
     </div>
@@ -150,20 +155,32 @@ const initCanvas = () => {
     return true;
 };
 
+// Add these formatting functions at the script level
+const formatNumber = (num, width) => {
+    if (typeof num === 'number') {
+        return num.toString().padStart(width, ' ');
+    }
+    return ''.padStart(width, ' ');
+};
+
+const padString = (str, width) => {
+    return (str || '').toString().padEnd(width, ' ');
+};
+
 // Update ship drawing to use camera transform
 const drawShip = (ctx, shipState) => {
     const screenPos = worldToScreen(shipState.position.x, shipState.position.y);
     
     ctx.save();
     ctx.translate(screenPos.x, screenPos.y);
-    ctx.rotate(shipState.angle);
     
+    // Draw ship first (existing ship drawing code)
+    ctx.rotate(shipState.angle);
     ctx.strokeStyle = shipState.color;
     ctx.fillStyle = shipState.color;
     ctx.lineWidth = 2;
     
     if (shipState.pattern === 'ufo') {
-        // UFO shape
         // Main saucer body
         ctx.beginPath();
         ctx.ellipse(0, 0, 15, 6, 0, 0, Math.PI * 2);
@@ -195,16 +212,100 @@ const drawShip = (ctx, shipState) => {
         ctx.stroke();
     }
     
-    // Draw engine flame if active
+    // Draw engine effect if active
     if (shipState.controls?.engineOn) {
+        const time = Date.now() * 0.01; // For flame animation
+        const flicker = Math.sin(time) * 0.3 + 0.7; // Flicker effect between 0.4 and 1.0
+        
+        // Main flame
         ctx.beginPath();
-        ctx.strokeStyle = '#FF9900';
+        ctx.strokeStyle = `rgba(255, 153, 0, ${flicker})`; // Orange with flicker
+        ctx.fillStyle = `rgba(255, 200, 0, ${flicker * 0.8})`; // Lighter orange center
+        
+        // Flame shape varies with time
+        const flameLength = (Math.sin(time * 1.5) * 2 + 10) * flicker;
+        const flameWidth = 4 * flicker;
+        
+        // Draw flame path
+        ctx.moveTo(0, 8);  // Start at ship base
+        ctx.lineTo(flameWidth, 8 + flameLength * 0.3);  // Right edge
+        ctx.lineTo(0, 8 + flameLength);  // Tip
+        ctx.lineTo(-flameWidth, 8 + flameLength * 0.3);  // Left edge
+        ctx.closePath();
+        
+        ctx.fill();  // Fill with lighter orange
+        ctx.stroke(); // Stroke with darker orange
+        
+        // Inner flame glow
+        ctx.beginPath();
+        ctx.strokeStyle = `rgba(255, 255, 200, ${flicker * 0.8})`; // Bright yellow core
         ctx.moveTo(0, 8);
-        ctx.lineTo(3, 13);
-        ctx.lineTo(0, 17);
-        ctx.lineTo(-3, 13);
+        ctx.lineTo(flameWidth * 0.5, 8 + flameLength * 0.4);
+        ctx.lineTo(0, 8 + flameLength * 0.8);
+        ctx.lineTo(-flameWidth * 0.5, 8 + flameLength * 0.4);
         ctx.closePath();
         ctx.stroke();
+        
+        // Add particle effect for extra detail
+        const particleCount = 3;
+        ctx.fillStyle = `rgba(255, 200, 0, ${flicker * 0.5})`;
+        for (let i = 0; i < particleCount; i++) {
+            const particleOffset = Math.sin(time + i * Math.PI * 2 / particleCount) * 2;
+            const particleY = 8 + flameLength * (0.5 + Math.random() * 0.5);
+            ctx.beginPath();
+            ctx.arc(particleOffset, particleY, 1, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
+    // Reset rotation for UI elements
+    ctx.rotate(-shipState.angle);
+    
+    // Draw callSign and health bar at 2 o'clock position
+    if (shipState.callSign) {
+        const distance = 35;  // Distance from ship center
+        const angle = -Math.PI/3;  // 2 o'clock position (-60 degrees)
+        
+        // Calculate position at 2 o'clock
+        const uiX = Math.cos(angle) * distance;
+        const uiY = Math.sin(angle) * distance;
+        
+        // Draw callSign
+        ctx.fillStyle = '#FFFFFF';  // Pure white
+        ctx.font = 'bold 12px Courier New';  // Made bold and slightly larger
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.lineWidth = 2;  // Thicker text
+        
+        // Add stroke for better visibility
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.strokeText(shipState.callSign, uiX, uiY);
+        ctx.fillText(shipState.callSign, uiX, uiY);
+        
+        // Draw health bar with current/max values
+        const healthBarWidth = 30;
+        const healthBarHeight = 4;
+        const healthBarY = uiY + 4;
+
+        // Health bar background
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(uiX, healthBarY, healthBarWidth, healthBarHeight);
+
+        // Health bar fill
+        const healthPercent = shipState.health / shipState.maxHealth;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(uiX, healthBarY, healthBarWidth * healthPercent, healthBarHeight);
+
+        // Add health value above health bar
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 10px Courier New';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${shipState.health}`, uiX + healthBarWidth + 5, healthBarY + healthBarHeight/2);
+        
+        // Add stroke around health bar for better visibility
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(uiX, healthBarY, healthBarWidth, healthBarHeight);
     }
     
     ctx.restore();
@@ -434,13 +535,15 @@ const gameLoop = () => {
             ship.value.angle = playerState.angle;
             ship.value.velocity = playerState.velocity;
             
-            // Update all ship info including home position
             shipInfo.value = {
+                callSign: playerState.callSign,  // Use the callSign from server state
+                health: playerState.health,  // Add health to info panel
+                maxHealth: playerState.maxHealth, // Add maxHealth to info panel
                 position: { 
                     x: Math.round(playerState.position.x), 
                     y: Math.round(playerState.position.y) 
                 },
-                home: playerState.home,  // Make sure home position is included
+                home: playerState.home,
                 angle: Math.round(playerState.angle * 180 / Math.PI),
                 velocity: { 
                     x: playerState.velocity.x.toFixed(2), 
@@ -476,6 +579,9 @@ onMounted(() => {
         
         // Initialize shipInfo with default values
         shipInfo.value = {
+            callSign: '----',  // Placeholder until we get real ID
+            health: 100, // Initialize health
+            maxHealth: 100, // Initialize maxHealth
             position: { x: 0, y: 0 },
             home: { x: 0, y: 0 },
             angle: 0,
