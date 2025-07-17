@@ -1,28 +1,5 @@
-<template>
-    <div class="game-container">
-        <canvas ref="canvas" class="game-canvas"></canvas>
-        
-        <!-- Info panel with fixed-width values -->
-        <div v-if="shipInfo" class="info-panel">
-            <div class="info-row"><span class="label">Call:</span> <span class="value">{{ padString(shipInfo.callSign, 6) }}</span></div>
-            <div class="info-row">
-                <span class="label">Health:</span> 
-                <span class="value">{{ formatNumber(shipInfo.health, 3) }}/{{ formatNumber(shipInfo.maxHealth, 3) }}</span>
-            </div>
-            <div class="info-row"><span class="label">Position:</span> <span class="value">{{ formatNumber(shipInfo.position.x, 6) }}, {{ formatNumber(shipInfo.position.y, 6) }}</span></div>
-            <div class="info-row"><span class="label">Angle:</span> <span class="value">{{ formatNumber(shipInfo.angle, 6) }}°</span></div>
-            <div class="info-row"><span class="label">Velocity:</span> <span class="value">{{ formatNumber(shipInfo.velocity.x, 6) }}, {{ formatNumber(shipInfo.velocity.y, 6) }}</span></div>
-            <div class="info-row"><span class="label">Home:</span> <span class="value">{{ formatNumber(shipInfo.home.x, 6) }}, {{ formatNumber(shipInfo.home.y, 6) }}</span></div>
-            <div class="info-row"><span class="label">Score:</span> <span class="value">{{ formatNumber(score, 6) }}</span></div>
-            <div class="info-row"><span class="label">Pattern:</span> <span class="value">{{ padString(shipInfo.pattern, 6) }}</span></div>
-            <div class="info-row"><span class="label">Team:</span> <span class="value">{{ padString(shipInfo.color, 6) }}</span></div>
-            <div class="info-row">Safe Zone: <span class="value">{{ inSafeZone ? 'Yes' : 'No' }}</span></div>
-        </div>
-    </div>
-</template>
-
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { Ship } from '../core/Ship';
 import { CanvasManager } from '../core/Canvas';
 import { useMultiplayer } from '../composables/useMultiplayer';
@@ -263,46 +240,52 @@ const drawShip = (ctx, shipState) => {
     
     // Draw callSign and health bar at 2 o'clock position
     if (shipState.callSign) {
-        const distance = 35;  // Distance from ship center
-        const angle = -Math.PI/3;  // 2 o'clock position (-60 degrees)
+        const distance = 35;
+        const angle = -Math.PI/3;  // 2 o'clock position
         
-        // Calculate position at 2 o'clock
         const uiX = Math.cos(angle) * distance;
         const uiY = Math.sin(angle) * distance;
         
-        // Draw callSign
-        ctx.fillStyle = '#FFFFFF';  // Pure white
-        ctx.font = 'bold 12px Courier New';  // Made bold and slightly larger
+        // Draw callSign with matching info panel style
+        const isCritical = shipState.health < 25;
+        
+        if (isCritical) {
+            ctx.shadowColor = '#FF0000';
+            ctx.fillStyle = '#FF0000';
+        } else {
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#FFFFFF';
+        }
+        
+        // Match info panel font and size
+        ctx.font = 'bold 12px Courier New';  // Changed from 'bold 12px' to match info panel
         ctx.textAlign = 'left';
         ctx.textBaseline = 'bottom';
-        ctx.lineWidth = 2;  // Thicker text
+        ctx.lineWidth = 1;  // Reduced from 2 to match info panel style
         
         // Add stroke for better visibility
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.strokeText(shipState.callSign, uiX, uiY);
         ctx.fillText(shipState.callSign, uiX, uiY);
         
-        // Draw health bar with current/max values
+        // Reset shadow for health bar
+        ctx.shadowBlur = 0;
+        
+        // Draw health bar
         const healthBarWidth = 30;
         const healthBarHeight = 4;
         const healthBarY = uiY + 4;
-
+        
         // Health bar background
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.fillRect(uiX, healthBarY, healthBarWidth, healthBarHeight);
-
-        // Health bar fill
-        const healthPercent = shipState.health / shipState.maxHealth;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(uiX, healthBarY, healthBarWidth * healthPercent, healthBarHeight);
-
-        // Add health value above health bar
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 10px Courier New';
-        ctx.textAlign = 'left';
-        ctx.fillText(`${shipState.health}`, uiX + healthBarWidth + 5, healthBarY + healthBarHeight/2);
         
-        // Add stroke around health bar for better visibility
+        // Health bar fill - red if critical
+        const healthPercent = shipState.health / shipState.maxHealth;
+        ctx.fillStyle = isCritical ? '#FF0000' : '#FFFFFF';
+        ctx.fillRect(uiX, healthBarY, healthBarWidth * healthPercent, healthBarHeight);
+        
+        // Add stroke around health bar
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.lineWidth = 1;
         ctx.strokeRect(uiX, healthBarY, healthBarWidth, healthBarHeight);
@@ -621,7 +604,69 @@ onUnmounted(() => {
     window.removeEventListener('keydown', handleKeyDown);
     window.removeEventListener('keyup', handleKeyUp);
 });
+
+// Add computed property for info items
+const infoItems = computed(() => [
+    {
+        label: 'CallSign',
+        value: () => padString(shipInfo.value.callSign, 6)
+    },
+    {
+        label: 'Health',
+        value: () => `${formatNumber(shipInfo.value.health, 3)}/${formatNumber(shipInfo.value.maxHealth, 3)}`
+    },
+    {
+        label: 'Position',
+        value: () => `${formatNumber(shipInfo.value.position.x, 6)}, ${formatNumber(shipInfo.value.position.y, 6)}`
+    },
+    {
+        label: 'Angle',
+        value: () => `${formatNumber(shipInfo.value.angle, 6)}°`
+    },
+    {
+        label: 'Velocity',
+        value: () => `${formatNumber(shipInfo.value.velocity.x, 6)}, ${formatNumber(shipInfo.value.velocity.y, 6)}`
+    },
+    {
+        label: 'Home',
+        value: () => `${formatNumber(shipInfo.value.home.x, 6)}, ${formatNumber(shipInfo.value.home.y, 6)}`
+    },
+    {
+        label: 'Score',
+        value: () => formatNumber(score.value, 6)
+    },
+    {
+        label: 'Pattern',
+        value: () => padString(shipInfo.value.pattern, 6)
+    },
+    {
+        label: 'Team',
+        value: () => padString(shipInfo.value.color, 6)
+    },
+    {
+        label: 'Safe Zone',
+        value: () => inSafeZone.value ? 'Yes' : 'No',
+        valueClass: 'text-green-600'
+    }
+]);
 </script>
+
+<template>
+    <div class="game-container">
+        <canvas ref="canvas" class="game-canvas"></canvas>
+        
+        <div v-if="shipInfo" class="absolute top-5 left-5 bg-black/30 text-green-400 p-2 rounded-lg border border-green-500 w-32 backdrop-blur-sm text-xxs">
+            <div v-for="(item, index) in infoItems" 
+                 :key="index"
+                 class="flex justify-between items-center whitespace-pre text-xxs -my-1">
+                <span class="text-white">{{ item.label }}:</span>
+                <span :class="[
+                    'text-green-400 text-right min-w-[60px] ',
+                ]">{{ item.value() }}</span>
+            </div>
+        </div>
+    </div>
+</template>
 
 <style scoped>
 .game-container {
@@ -634,45 +679,5 @@ onUnmounted(() => {
     position: absolute;
     top: 0;
     left: 0;
-}
-
-.info-panel {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    background: rgba(0, 0, 0, 0.3);  /* Increased transparency (0.3 from 0.5) */
-    color: #33FF33;
-    font-family: 'Courier New', monospace;
-    padding: 12px 15px;  /* Reduced padding */
-    border-radius: 8px;
-    border: 1px solid rgba(51, 255, 51, 0.5);  /* Thinner, more transparent border */
-    font-size: 14px;
-    line-height: 1.6;
-    min-width: 240px;  /* Reduced from 300px */
-    max-width: 240px;  /* Added max-width to ensure consistent size */
-    box-shadow: 0 0 10px rgba(51, 255, 51, 0.15);  /* More transparent shadow */
-    backdrop-filter: blur(2px);  /* Reduced blur effect */
-}
-
-.info-row {
-    margin: 4px 0;
-    display: flex;
-    justify-content: space-between;
-    white-space: pre;
-}
-
-.label {
-    color: rgba(51, 255, 51, 0.9);  /* Slightly transparent green */
-    font-size: 13px;  /* Slightly larger than values for contrast */
-}
-
-.value {
-    color: rgba(255, 255, 255, 0.95);  /* Kept text mostly opaque for readability */
-    text-shadow: 0 0 5px rgba(51, 255, 51, 0.5);  /* More transparent glow */
-    font-family: 'Courier New', monospace;
-    font-size: 12px;  /* Reduced from 14px */
-    min-width: 120px;  /* Reduced from 160px */
-    text-align: right;
-    display: inline-block;
 }
 </style> 
