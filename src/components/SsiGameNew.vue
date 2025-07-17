@@ -657,14 +657,16 @@ const infoItems = computed(() => [
         <canvas ref="canvas" class="game-canvas"></canvas>
         
         <!-- Info Panel -->
-        <div v-if="shipInfo" class="absolute top-5 left-5 bg-black/30 text-green-400 p-2 rounded-lg border border-green-500 w-32 backdrop-blur-sm text-xxs">
+        <div v-if="shipInfo" class="absolute top-3 left-3 bg-black/30 text-green-400 p-2 rounded-lg border border-green-500 w-32 backdrop-blur-sm text-xxs">
             <div v-for="(item, index) in infoItems" 
                  :key="index"
                  class="flex justify-between items-center whitespace-pre text-xxs -my-1">
-                <span class="text-white">{{ item.label }}:</span>
-                <span :class="[
-                    'text-green-400 text-right min-w-[60px] ',
-                ]">{{ item.value() }}</span>
+                <span class="text-white">
+                    {{ item.label }}:
+                </span>
+                <span :class="['text-right min-w-[60px] ',]">
+                    {{ item.value() }}
+                </span>
             </div>
         </div>
 
@@ -672,7 +674,7 @@ const infoItems = computed(() => [
         <GameMinimap 
             :game-state="gameState"
             :player-id="socket?.id"
-            :size="150"
+            :size="175"
             :world-width="8000"
             :world-height="6000"
         />

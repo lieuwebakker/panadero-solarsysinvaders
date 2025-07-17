@@ -188,18 +188,26 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="minimap-container" :style="containerStyle">
+  <div class="minimap-container bg-black/30 border border-green-500 backdrop-blur-sm rounded-lg p-2" :style="containerStyle">
     <canvas 
       ref="minimapCanvas" 
-      class="minimap-canvas"
+      class="minimap-canvas rounded-lg"
       :width="size" 
       :height="size"
     ></canvas>
-    <div class="minimap-overlay">
-      <div class="minimap-title">Minimap</div>
-      <div class="minimap-stats">
-        <span>Players: {{ playerCount }}</span>
-        <span>Collectibles: {{ collectibleCount }}</span>
+    
+    <div class="minimap-overlay text-xxs">
+      <div class="flex justify-between items-center whitespace-pre -my-1">
+        <span class="text-white">Minimap:</span>
+        <span class="text-green-400 text-right min-w-[60px]">Active</span>
+      </div>
+      <div class="flex justify-between items-center whitespace-pre -my-1.5">
+        <span class="text-white">Players:</span>
+        <span class="text-green-400 text-right min-w-[60px]">{{ playerCount }}</span>
+      </div>
+      <div class="flex justify-between items-center whitespace-pre -my-1.5">
+        <span class="text-white">Items:</span>
+        <span class="text-green-400 text-right min-w-[60px]">{{ collectibleCount }}</span>
       </div>
     </div>
   </div>
@@ -210,9 +218,6 @@ onUnmounted(() => {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: rgba(0, 0, 0, 0.8);
-  border: 2px solid #444;
-  border-radius: 8px;
   z-index: 1000;
   overflow: hidden;
 }
@@ -228,26 +233,6 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
   padding: 5px;
-  color: white;
-  font-size: 10px;
-  font-family: monospace;
-}
-
-.minimap-title {
-  font-weight: bold;
-  margin-bottom: 2px;
-}
-
-.minimap-stats {
-  display: flex;
-  justify-content: space-between;
-  font-size: 8px;
-  opacity: 0.8;
-}
-
-.minimap-stats span {
-  margin-right: 8px;
 }
 </style>
